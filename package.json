@@ -1,0 +1,53 @@
+{
+    "name": "basketball-news-crawler",
+    "version": "1.0.0",
+    "description": "A basketball news aggregation system that crawls content from social media and sports news websites",
+    "type": "module",
+    "engines": {
+        "node": ">=24.0.0"
+    },
+    "main": "dist/index.js",
+    "bin": {
+        "news-crawler": "dist/index.js"
+    },
+    "scripts": {
+        "dev": "tsx src/index.ts",
+        "build": "tsc",
+        "start": "node dist/index.js",
+        "crawl": "tsx src/index.ts crawl",
+        "list": "tsx src/index.ts list",
+        "search": "tsx src/index.ts search",
+        "history": "tsx src/index.ts history",
+        "stats": "tsx src/index.ts stats",
+        "export": "tsx src/index.ts export",
+        "cleanup": "tsx src/index.ts cleanup",
+        "schedule": "tsx src/index.ts schedule"
+    },
+    "keywords": [
+        "basketball",
+        "news",
+        "crawler",
+        "scraper",
+        "nba"
+    ],
+    "author": "",
+    "license": "MIT",
+    "dependencies": {
+        "commander": "^12.0.0",
+        "lowdb": "^7.0.1",
+        "node-cron": "^3.0.3",
+        "playwright": "^1.41.0",
+        "playwright-extra": "^4.3.6",
+        "puppeteer-extra-plugin-stealth": "^2.11.2",
+        "rss-parser": "^3.13.0",
+        "uuid": "^9.0.1",
+        "winston": "^3.11.0"
+    },
+    "devDependencies": {
+        "@types/node": "^22.0.0",
+        "@types/node-cron": "^3.0.11",
+        "@types/uuid": "^9.0.7",
+        "tsx": "^4.7.0",
+        "typescript": "^5.4.0"
+    }
+}

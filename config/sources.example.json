@@ -1,0 +1,116 @@
+{
+    "twitter": {
+        "enabled": true,
+        "crawlIntervalMinutes": 30,
+        "accounts": [
+            "wojespn",
+            "ShamsCharania",
+            "WindhorstESPN",
+            "ChrisBHaynes",
+            "TheSteinLine",
+            "ZachLowe_NBA",
+            "JakeLFischer",
+            "sam_amick",
+            "TheNBACentral",
+            "HoopCentral"
+        ]
+    },
+    "instagram": {
+        "enabled": true,
+        "crawlIntervalMinutes": 60,
+        "accounts": [
+            "nba",
+            "espn",
+            "bleacherreport",
+            "houseofhighlights",
+            "nbamemes",
+            "thehoopcentral"
+        ]
+    },
+    "threads": {
+        "enabled": false,
+        "crawlIntervalMinutes": 60,
+        "accounts": [
+            "nba",
+            "espn"
+        ]
+    },
+    "websites": {
+        "enabled": true,
+        "crawlIntervalMinutes": 120,
+        "sources": [
+            {
+                "name": "ESPN NBA",
+                "url": "https://www.espn.com/nba/",
+                "type": "rss",
+                "feedUrl": "https://www.espn.com/espn/rss/nba/news"
+            },
+            {
+                "name": "NBA.com Official",
+                "url": "https://www.nba.com/news",
+                "type": "rss",
+                "feedUrl": "https://www.nba.com/feeds/news.xml"
+            },
+            {
+                "name": "Yahoo Sports NBA",
+                "url": "https://sports.yahoo.com/nba/",
+                "type": "rss",
+                "feedUrl": "https://sports.yahoo.com/nba/rss.xml"
+            },
+            {
+                "name": "CBS Sports NBA",
+                "url": "https://www.cbssports.com/nba/",
+                "type": "rss",
+                "feedUrl": "https://www.cbssports.com/rss/headlines/nba/"
+            },
+            {
+                "name": "Bleacher Report NBA",
+                "url": "https://bleacherreport.com/nba",
+                "type": "html",
+                "selectors": {
+                    "article": "article.articleCard, [data-testid='article-card']",
+                    "title": "h3, [data-testid='title']",
+                    "link": "a[href*='/articles/']",
+                    "content": "p, [data-testid='description']",
+                    "date": "time"
+                }
+            },
+            {
+                "name": "The Athletic NBA",
+                "url": "https://theathletic.com/nba/",
+                "type": "html",
+                "selectors": {
+                    "article": "article, [data-testid='article']",
+                    "title": "h2, h3, [data-testid='headline']",
+                    "link": "a[href*='/article/']",
+                    "content": "p",
+                    "author": "[data-testid='author'], .author-name"
+                }
+            },
+            {
+                "name": "Hoops Hype",
+                "url": "https://hoopshype.com/",
+                "type": "html",
+                "selectors": {
+                    "article": "article, .post",
+                    "title": "h2.post-title a, h3 a",
+                    "link": "a[href*='/posts/'], h2 a, h3 a",
+                    "content": ".post-excerpt, .entry-summary",
+                    "date": "time, .post-date"
+                }
+            },
+            {
+                "name": "RealGM Basketball",
+                "url": "https://basketball.realgm.com/",
+                "type": "html",
+                "selectors": {
+                    "article": ".news-item, article",
+                    "title": "a.headline, h3 a",
+                    "link": "a.headline, h3 a",
+                    "content": ".description, p",
+                    "date": ".date, time"
+                }
+            }
+        ]
+    }
+}

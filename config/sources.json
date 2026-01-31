@@ -1,0 +1,76 @@
+{
+    "twitter": {
+        "enabled": true,
+        "crawlIntervalMinutes": 30,
+        "accounts": [
+            "wojespn",
+            "ShamsCharania",
+            "WindhorstESPN",
+            "ChrisBHaynes",
+            "TheSteinLine"
+        ]
+    },
+    "instagram": {
+        "enabled": true,
+        "crawlIntervalMinutes": 60,
+        "accounts": [
+            "nba",
+            "espn",
+            "bleacherreport",
+            "houseofhighlights"
+        ]
+    },
+    "threads": {
+        "enabled": false,
+        "crawlIntervalMinutes": 60,
+        "accounts": []
+    },
+    "websites": {
+        "enabled": true,
+        "crawlIntervalMinutes": 120,
+        "sources": [
+            {
+                "name": "ESPN NBA",
+                "url": "https://www.espn.com/nba/",
+                "type": "rss",
+                "feedUrl": "https://www.espn.com/espn/rss/nba/news"
+            },
+            {
+                "name": "Yahoo Sports NBA",
+                "url": "https://sports.yahoo.com/nba/",
+                "type": "rss",
+                "feedUrl": "https://sports.yahoo.com/nba/rss"
+            },
+            {
+                "name": "CBS Sports NBA",
+                "url": "https://www.cbssports.com/nba/",
+                "type": "rss",
+                "feedUrl": "https://www.cbssports.com/rss/headlines/nba/"
+            },
+            {
+                "name": "Bleacher Report NBA",
+                "url": "https://bleacherreport.com/nba",
+                "type": "html",
+                "selectors": {
+                    "article": "a[href*='/articles/'], div[class*='MuiCard-root'], div[class*='MuiPaper-root']",
+                    "title": "h2, h3",
+                    "link": "a[href*='/articles/']",
+                    "content": "p, span",
+                    "date": "[class*='Meta'], span"
+                }
+            },
+            {
+                "name": "The Athletic NBA",
+                "url": "https://www.nytimes.com/athletic/nba/",
+                "type": "html",
+                "selectors": {
+                    "article": "a[href*='/athletic/']",
+                    "title": "h2, h3, h4, p[class*='Typography'], [class*='headline']",
+                    "link": "a[href*='/athletic/']",
+                    "content": "p:not([class*='Meta']), [class*='description'], [class*='summary']",
+                    "date": "time, [class*='time']"
+                }
+            }
+        ]
+    }
+}
