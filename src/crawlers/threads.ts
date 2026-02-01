@@ -28,12 +28,28 @@ export class ThreadsCrawler extends BaseCrawler<PlatformConfig> {
     }
 
     /**
-     * Fetch posts from all configured accounts
+     * Fetch posts from all configured accounts or a specific target
+     * @param target Optional target account to crawl
      */
-    protected async fetchArticles(): Promise<Article[]> {
+    protected async fetchArticles(target?: string): Promise<Article[]> {
         const articles: Article[] = [];
 
-        if (this.config.accounts.length === 0) {
+        // Determine which accounts to crawl
+        let accountsToCrawl = this.config.accounts;
+        if (target) {
+            const normalizedTarget = target.replace('@', '').toLowerCase();
+            const matchedAccount = this.config.accounts.find(
+                acc => acc.replace('@', '').toLowerCase() === normalizedTarget
+            );
+            if (!matchedAccount) {
+                log.warn(`Target account "${target}" not found in configured Threads accounts`);
+                return articles;
+            }
+            accountsToCrawl = [matchedAccount];
+            log.info(`Targeting specific Threads account: @${matchedAccount}`);
+        }
+
+        if (accountsToCrawl.length === 0) {
             log.warn('No Threads accounts configured');
             return articles;
         }
@@ -49,7 +65,7 @@ export class ThreadsCrawler extends BaseCrawler<PlatformConfig> {
                 ]
             });
 
-            for (const account of this.config.accounts) {
+            for (const account of accountsToCrawl) {
                 try {
                     const accountArticles = await this.fetchAccountPosts(account);
                     articles.push(...accountArticles);

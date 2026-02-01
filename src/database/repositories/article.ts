@@ -153,4 +153,74 @@ export class ArticleRepository {
         await this.db.write();
         return true;
     }
+
+    /**
+     * Find articles that need content fetching
+     * Returns articles where BOTH fullContent AND aiSummary are empty/null
+     */
+    findNeedingContent(options: {
+        source?: ArticleSource;
+        limit?: number;
+        startDate?: string;
+        endDate?: string;
+        force?: boolean;
+    } = {}): Article[] {
+        let filtered = this.db.data.articles.filter(a => {
+            // Skip if fullContent OR aiSummary already exists (unless force)
+            if (!options.force) {
+                const hasFullContent = a.fullContent && a.fullContent.trim().length > 0;
+                const hasAiSummary = a.aiSummary && a.aiSummary.trim().length > 0;
+                if (hasFullContent || hasAiSummary) {
+                    return false;
+                }
+            }
+
+            // Filter by source
+            if (options.source && a.source !== options.source) {
+                return false;
+            }
+
+            // Filter by date range
+            if (a.publishedAt) {
+                const pubDate = new Date(a.publishedAt);
+                if (options.startDate && pubDate < new Date(options.startDate)) {
+                    return false;
+                }
+                if (options.endDate && pubDate > new Date(options.endDate + 'T23:59:59')) {
+                    return false;
+                }
+            }
+
+            return true;
+        });
+
+        // Sort by crawledAt descending (most recent first)
+        filtered = filtered.sort((a, b) =>
+            new Date(b.crawledAt).getTime() - new Date(a.crawledAt).getTime()
+        );
+
+        // Apply limit
+        if (options.limit && options.limit > 0) {
+            filtered = filtered.slice(0, options.limit);
+        }
+
+        return filtered;
+    }
+
+    /**
+     * Update article with fetched content
+     */
+    async updateContent(
+        id: string,
+        fullContent: string,
+        fullContentFetchedAt: string
+    ): Promise<boolean> {
+        const article = this.db.data.articles.find(a => a.id === id);
+        if (!article) return false;
+
+        article.fullContent = fullContent;
+        article.fullContentFetchedAt = fullContentFetchedAt;
+        await this.db.write();
+        return true;
+    }
 }

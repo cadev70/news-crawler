@@ -44,6 +44,15 @@ export interface Article {
 
     /** Platform-specific metadata */
     metadata: Record<string, unknown>;
+
+    /** Full extracted article content (clean plain text from source URL) */
+    fullContent?: string | null;
+
+    /** Timestamp when fullContent was fetched */
+    fullContentFetchedAt?: string | null;
+
+    /** AI-generated summary of the article */
+    aiSummary?: string | null;
 }
 
 /**

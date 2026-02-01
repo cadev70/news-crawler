@@ -37,17 +37,35 @@ export class WebsiteCrawler extends BaseCrawler<WebsiteConfig> {
     }
 
     /**
-     * Fetch articles from all configured sources
+     * Fetch articles from all configured sources or a specific target
+     * @param target Optional target source name to crawl (e.g., "ESPN NBA")
      */
-    protected async fetchArticles(): Promise<Article[]> {
+    protected async fetchArticles(target?: string): Promise<Article[]> {
         const articles: Article[] = [];
 
-        if (this.config.sources.length === 0) {
+        // Determine which sources to crawl
+        let sourcesToCrawl = this.config.sources;
+        if (target) {
+            const normalizedTarget = target.toLowerCase();
+            const matchedSource = this.config.sources.find(
+                src => src.name.toLowerCase() === normalizedTarget ||
+                       src.name.toLowerCase().includes(normalizedTarget)
+            );
+            if (!matchedSource) {
+                log.warn(`Target website "${target}" not found in configured sources`);
+                log.info(`Available sources: ${this.config.sources.map(s => s.name).join(', ')}`);
+                return articles;
+            }
+            sourcesToCrawl = [matchedSource];
+            log.info(`Targeting specific website source: ${matchedSource.name}`);
+        }
+
+        if (sourcesToCrawl.length === 0) {
             log.warn('No website sources configured');
             return articles;
         }
 
-        for (const source of this.config.sources) {
+        for (const source of sourcesToCrawl) {
             try {
                 const sourceArticles = source.type === 'rss'
                     ? await this.fetchRssArticles(source)

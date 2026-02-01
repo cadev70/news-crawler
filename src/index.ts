@@ -10,6 +10,7 @@ import { initDatabase } from './database/index.js';
 import { ArticleRepository } from './database/repositories/article.js';
 import { CrawlHistoryRepository } from './database/repositories/history.js';
 import { log } from './utils/logger.js';
+import { isValidDateFormat, validateDateRange } from './utils/date-filter.js';
 import type { ArticleSource } from './config/types.js';
 import type { Article } from './models/article.js';
 import type { CrawlHistory } from './models/crawl-history.js';
@@ -28,10 +29,49 @@ program
     .command('crawl')
     .description('Crawl news from configured sources')
     .option('-s, --source <source>', 'Crawl specific source only (twitter, instagram, threads, website)')
+    .option('-t, --target <target>', 'Crawl specific target account or website name (requires --source)')
+    .option('--start-date <date>', 'Only include articles published on or after this date (YYYY-MM-DD)')
+    .option('--end-date <date>', 'Only include articles published on or before this date (YYYY-MM-DD)')
     .option('--all', 'Crawl all sources including disabled ones')
     .action(async (options) => {
         try {
             const orchestrator = new CrawlerOrchestrator();
+
+            // Validate that --target requires --source
+            if (options.target && !options.source) {
+                console.error('Error: --target requires --source to be specified');
+                console.log('Example: pnpm crawl --source twitter --target wojespn');
+                process.exit(1);
+            }
+
+            // Validate date options
+            if (options.startDate && !isValidDateFormat(options.startDate)) {
+                console.error('Error: Invalid date format. Use YYYY-MM-DD.');
+                process.exit(1);
+            }
+            if (options.endDate && !isValidDateFormat(options.endDate)) {
+                console.error('Error: Invalid date format. Use YYYY-MM-DD.');
+                process.exit(1);
+            }
+            if (options.startDate && options.endDate) {
+                try {
+                    validateDateRange(options.startDate, options.endDate);
+                } catch (error) {
+                    console.error(`Error: ${error instanceof Error ? error.message : error}`);
+                    process.exit(1);
+                }
+            }
+
+            // Build crawl options
+            const crawlOptions: { target?: string; startDate?: string; endDate?: string } = {};
+            if (options.target) crawlOptions.target = options.target;
+            if (options.startDate) crawlOptions.startDate = options.startDate;
+            if (options.endDate) crawlOptions.endDate = options.endDate;
+
+            // Display date range info
+            const dateRangeInfo = (options.startDate || options.endDate)
+                ? `\n📅 Date range: ${options.startDate || '*'} to ${options.endDate || '*'}`
+                : '';
 
             if (options.source) {
                 const source = options.source as ArticleSource;
@@ -43,18 +83,19 @@ program
                     process.exit(1);
                 }
 
-                console.log(`\n🏀 Crawling ${source}...\n`);
-                const result = await orchestrator.crawlSource(source);
+                const targetInfo = options.target ? ` (target: ${options.target})` : '';
+                console.log(`\n🏀 Crawling ${source}${targetInfo}...${dateRangeInfo}\n`);
+                const result = await orchestrator.crawlSource(source, crawlOptions);
 
                 if (result) {
-                    printCrawlResult(result);
+                    printCrawlResult(result, options.startDate, options.endDate);
                 } else {
                     console.log(`Source ${source} is disabled or not configured.`);
                 }
             } else {
-                console.log('\n🏀 Starting full crawl...\n');
-                const result = await orchestrator.crawlAll();
-                printOrchestratorResult(result);
+                console.log(`\n🏀 Starting full crawl...${dateRangeInfo}\n`);
+                const result = await orchestrator.crawlAll(crawlOptions);
+                printOrchestratorResult(result, options.startDate, options.endDate);
             }
 
             await orchestrator.cleanup();
@@ -376,6 +417,94 @@ program
     });
 
 // ============================================================================
+// FETCH-CONTENT COMMAND
+// ============================================================================
+program
+    .command('fetch-content')
+    .description('Fetch full article content from source URLs')
+    .option('--limit <n>', 'Maximum articles to process')
+    .option('--source <type>', 'Filter by source type (e.g., website)')
+    .option('--force', 'Re-fetch even if fullContent exists')
+    .option('--id <articleId>', 'Fetch specific article by ID')
+    .option('--start-date <date>', 'Filter by publish date (YYYY-MM-DD)')
+    .option('--end-date <date>', 'Filter by publish date (YYYY-MM-DD)')
+    .option('--max-delay <ms>', 'Maximum delay between requests (default: 2000)')
+    .option('--quiet', 'Suppress progress output')
+    .action(async (options) => {
+        try {
+            const { ContentFetcher } = await import('./services/content-fetcher.js');
+
+            const db = await initDatabase();
+            const fetcher = new ContentFetcher(db);
+
+            // Validate date options
+            if (options.startDate && !isValidDateFormat(options.startDate)) {
+                console.error('Error: Invalid start date format. Use YYYY-MM-DD.');
+                process.exit(1);
+            }
+            if (options.endDate && !isValidDateFormat(options.endDate)) {
+                console.error('Error: Invalid end date format. Use YYYY-MM-DD.');
+                process.exit(1);
+            }
+
+            console.log('\n🔍 Fetching article content...\n');
+
+            // Progress callback
+            const onProgress = options.quiet ? undefined : (
+                current: number,
+                total: number,
+                url: string,
+                status: 'fetching' | 'success' | 'failed',
+                details?: string
+            ) => {
+                if (status === 'fetching') {
+                    console.log(`[${current}/${total}] Fetching: ${url}`);
+                } else if (status === 'success') {
+                    console.log(`       ✅ Extracted ${details}`);
+                } else {
+                    console.log(`       ❌ Failed: ${details}`);
+                }
+            };
+
+            const result = await fetcher.processArticles({
+                limit: options.limit ? parseInt(options.limit, 10) : undefined,
+                source: options.source as ArticleSource | undefined,
+                force: options.force,
+                articleId: options.id,
+                startDate: options.startDate,
+                endDate: options.endDate,
+                maxDelay: options.maxDelay ? parseInt(options.maxDelay, 10) : undefined,
+                quiet: options.quiet
+            }, onProgress);
+
+            // Print summary
+            console.log('\n' + '═'.repeat(50));
+            console.log('📊 Fetch Content Summary');
+            console.log('═'.repeat(50));
+            console.log(`   Processed: ${result.processed}`);
+            console.log(`   Successful: ${result.successful}`);
+            console.log(`   Failed: ${result.failed}`);
+            console.log(`   Skipped: ${result.skipped}`);
+
+            if (result.errors.length > 0 && !options.quiet) {
+                console.log('\n❌ Errors:');
+                for (const err of result.errors.slice(0, 5)) {
+                    console.log(`   - ${err.articleId}: ${err.error}`);
+                }
+                if (result.errors.length > 5) {
+                    console.log(`   ... and ${result.errors.length - 5} more`);
+                }
+            }
+
+            console.log('');
+        } catch (error) {
+            log.error('Fetch content failed', { error });
+            console.error('Fetch content failed:', error instanceof Error ? error.message : error);
+            process.exit(1);
+        }
+    });
+
+// ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
 
@@ -398,29 +527,56 @@ function printHistoryEntry(entry: CrawlHistory): void {
     }
 }
 
-function printCrawlResult(result: import('./crawlers/base.js').CrawlResult): void {
+function printCrawlResult(
+    result: import('./crawlers/base.js').CrawlResult,
+    startDate?: string,
+    endDate?: string
+): void {
     const statusIcon = result.status === 'success' ? '✅' : result.status === 'failed' ? '❌' : '⚠️';
-    console.log(`${statusIcon} ${result.source}`);
+    const targetInfo = result.target ? ` → ${result.target}` : '';
+    console.log(`${statusIcon} ${result.source}${targetInfo}`);
     console.log(`   Found: ${result.articlesFound}`);
     console.log(`   Saved: ${result.articlesSaved}`);
+    if (result.articlesFilteredByDate !== undefined && result.articlesFilteredByDate > 0) {
+        console.log(`   Filtered by date: ${result.articlesFilteredByDate}`);
+    }
     console.log(`   Duration: ${result.duration}ms`);
+    if (startDate || endDate) {
+        console.log(`   Date range: ${startDate || '*'} to ${endDate || '*'}`);
+    }
     if (result.errors.length > 0) {
         console.log(`   Errors: ${result.errors.join(', ')}`);
     }
     console.log('');
 }
 
-function printOrchestratorResult(result: import('./crawlers/orchestrator.js').OrchestratorResult): void {
+function printOrchestratorResult(
+    result: import('./crawlers/orchestrator.js').OrchestratorResult,
+    startDate?: string,
+    endDate?: string
+): void {
     console.log('═'.repeat(50));
     console.log('🏀 Crawl Summary');
+    if (startDate || endDate) {
+        console.log(`📅 Date range: ${startDate || '*'} to ${endDate || '*'}`);
+    }
     console.log('═'.repeat(50));
 
     for (const sourceResult of result.sources) {
         printCrawlResult(sourceResult);
     }
 
+    // Calculate total filtered by date
+    const totalFilteredByDate = result.sources.reduce(
+        (sum, r) => sum + (r.articlesFilteredByDate || 0),
+        0
+    );
+
     console.log('─'.repeat(50));
     console.log(`📊 Total: ${result.summary.totalArticlesFound} found, ${result.summary.totalArticlesSaved} saved`);
+    if (totalFilteredByDate > 0) {
+        console.log(`📅 Filtered by date: ${totalFilteredByDate}`);
+    }
     console.log(`⏱️  Duration: ${result.totalDuration}ms`);
     console.log(`✅ Success: ${result.summary.successCount} | ❌ Failed: ${result.summary.failedCount} | ⚠️  Partial: ${result.summary.partialCount}`);
     console.log('');

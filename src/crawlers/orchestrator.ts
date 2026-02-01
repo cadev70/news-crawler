@@ -5,7 +5,7 @@
 
 import type { SourceConfig, ArticleSource } from '../config/types.js';
 import { loadConfig, getEnabledSources } from '../config/index.js';
-import { BaseCrawler, CrawlResult } from './base.js';
+import { BaseCrawler, CrawlResult, CrawlOptions } from './base.js';
 import { TwitterCrawler } from './twitter.js';
 import { InstagramCrawler } from './instagram.js';
 import { ThreadsCrawler } from './threads.js';
@@ -74,7 +74,7 @@ export class CrawlerOrchestrator {
     /**
      * Crawl all enabled sources
      */
-    async crawlAll(): Promise<OrchestratorResult> {
+    async crawlAll(options: CrawlOptions = {}): Promise<OrchestratorResult> {
         const startTime = Date.now();
         const enabledSources = getEnabledSources(this.config);
 
@@ -85,7 +85,7 @@ export class CrawlerOrchestrator {
         // Run crawlers sequentially to avoid rate limiting issues
         for (const source of enabledSources) {
             try {
-                const result = await this.crawlSource(source);
+                const result = await this.crawlSource(source, options);
                 if (result) {
                     results.push(result);
                 }
@@ -112,8 +112,10 @@ export class CrawlerOrchestrator {
 
     /**
      * Crawl a specific source
+     * @param source The source type to crawl
+     * @param options Optional crawl options including target filter
      */
-    async crawlSource(source: ArticleSource): Promise<CrawlResult | null> {
+    async crawlSource(source: ArticleSource, options: CrawlOptions = {}): Promise<CrawlResult | null> {
         const crawler = this.getCrawler(source);
 
         if (!crawler) {
@@ -127,7 +129,7 @@ export class CrawlerOrchestrator {
         }
 
         try {
-            return await crawler.crawl();
+            return await crawler.crawl(options);
         } finally {
             // Cleanup crawler resources
             await crawler.cleanup();
@@ -137,7 +139,7 @@ export class CrawlerOrchestrator {
     /**
      * Crawl multiple specific sources
      */
-    async crawlSources(sources: ArticleSource[]): Promise<OrchestratorResult> {
+    async crawlSources(sources: ArticleSource[], options: CrawlOptions = {}): Promise<OrchestratorResult> {
         const startTime = Date.now();
         const results: CrawlResult[] = [];
 
@@ -145,7 +147,7 @@ export class CrawlerOrchestrator {
 
         for (const source of sources) {
             try {
-                const result = await this.crawlSource(source);
+                const result = await this.crawlSource(source, options);
                 if (result) {
                     results.push(result);
                 }

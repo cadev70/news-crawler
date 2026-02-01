@@ -24,8 +24,8 @@ logs/*.log
 *.swp
 *.swo
 
-
-
+# Export Data
+export.json
 
 # OS
 .DS_Store
@@ -37,3 +37,10 @@ coverage/
 # Playwright
 playwright-report/
 test-results/
+
+# AI
+.claude/
+CLAUDE.md
+.gemini/
+GEMINI.md
+.kiro/

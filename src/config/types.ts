@@ -5,11 +5,21 @@
 // Source types
 export type ArticleSource = 'twitter' | 'instagram' | 'threads' | 'website';
 
+// Sanitization configuration
+export interface SanitizationConfig {
+    /** Enable/disable trimming of whitespace */
+    trimWhitespace: boolean;
+    /** Enable/disable preserving paragraph breaks */
+    preserveParagraphs: boolean;
+}
+
 // Platform configuration (Twitter, Instagram, Threads)
 export interface PlatformConfig {
     enabled: boolean;
     crawlIntervalMinutes: number;
     accounts: string[];
+    /** Optional per-source sanitization configuration */
+    sanitization?: Partial<SanitizationConfig>;
 }
 
 // HTML selectors for website scraping
@@ -29,6 +39,8 @@ export interface WebsiteSource {
     type: 'rss' | 'html';
     feedUrl?: string;           // For RSS type
     selectors?: HTMLSelectors;  // For HTML type
+    /** Optional per-source sanitization configuration */
+    sanitization?: Partial<SanitizationConfig>;
 }
 
 // Website configuration

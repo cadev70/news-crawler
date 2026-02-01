@@ -1,6 +1,6 @@
 {
     "twitter": {
-        "enabled": true,
+        "enabled": false,
         "crawlIntervalMinutes": 30,
         "accounts": [
             "wojespn",
@@ -11,7 +11,7 @@
         ]
     },
     "instagram": {
-        "enabled": true,
+        "enabled": false,
         "crawlIntervalMinutes": 60,
         "accounts": [
             "nba",
@@ -64,12 +64,18 @@
                 "url": "https://www.nytimes.com/athletic/nba/",
                 "type": "html",
                 "selectors": {
-                    "article": "a[href*='/athletic/']",
+                    "article": "a[href*='/athletic/nba/']",
                     "title": "h2, h3, h4, p[class*='Typography'], [class*='headline']",
-                    "link": "a[href*='/athletic/']",
+                    "link": "a[href*='/athletic/nba/']",
                     "content": "p:not([class*='Meta']), [class*='description'], [class*='summary']",
                     "date": "time, [class*='time']"
                 }
+            },
+            {
+                "name": "ClutchPoints NBA",
+                "url": "https://clutchpoints.com/nba/",
+                "type": "rss",
+                "feedUrl": "https://clutchpoints.com/nba/feed"
             }
         ]
     }

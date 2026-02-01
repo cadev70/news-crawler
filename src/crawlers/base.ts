@@ -5,12 +5,14 @@
 
 import type { Article } from '../models/article.js';
 import type { CrawlHistory, CrawlStatus } from '../models/crawl-history.js';
-import type { ArticleSource } from '../config/types.js';
+import type { ArticleSource, SanitizationConfig } from '../config/types.js';
 import { initDatabase } from '../database/index.js';
 import { ArticleRepository } from '../database/repositories/article.js';
 import { CrawlHistoryRepository } from '../database/repositories/history.js';
 import { log } from '../utils/logger.js';
 import { generateId } from '../utils/id.js';
+import { sanitizeArticles } from '../utils/sanitizer.js';
+import { filterByDateRange } from '../utils/date-filter.js';
 
 /**
  * Crawl result returned by each crawler
@@ -23,6 +25,21 @@ export interface CrawlResult {
     articlesSaved: number;
     errors: string[];
     status: CrawlStatus;
+    target?: string;
+    /** Number of articles excluded by date filter */
+    articlesFilteredByDate?: number;
+}
+
+/**
+ * Options for crawl operations
+ */
+export interface CrawlOptions {
+    /** Target specific account (for social media) or source name (for websites) */
+    target?: string;
+    /** Start date for filtering (inclusive, YYYY-MM-DD) */
+    startDate?: string;
+    /** End date for filtering (inclusive, YYYY-MM-DD) */
+    endDate?: string;
 }
 
 /**
@@ -61,28 +78,60 @@ export abstract class BaseCrawler<T extends BaseCrawlerConfig = BaseCrawlerConfi
     /**
      * Template method - orchestrates the crawl process
      */
-    async crawl(): Promise<CrawlResult> {
+    async crawl(options: CrawlOptions = {}): Promise<CrawlResult> {
         const startTime = Date.now();
         const errors: string[] = [];
         let articlesFound = 0;
         let articlesSaved = 0;
+        let articlesFilteredByDate = 0;
+        const { target, startDate, endDate } = options;
 
         try {
             // Initialize if needed
             await this.init();
 
-            log.info(`Starting crawl for ${this.name}`);
+            const targetInfo = target ? ` (target: ${target})` : '';
+            const dateRangeInfo = (startDate || endDate)
+                ? ` [${startDate || '*'} to ${endDate || '*'}]`
+                : '';
+            log.info(`Starting crawl for ${this.name}${targetInfo}${dateRangeInfo}`);
 
             // Fetch articles from source
-            const articles = await this.fetchArticles();
+            const articles = await this.fetchArticles(target);
             articlesFound = articles.length;
-            log.info(`Found ${articlesFound} articles from ${this.name}`);
+            log.info(`Found ${articlesFound} articles from ${this.name}${targetInfo}`);
 
             if (articles.length === 0) {
                 log.info(`No articles found from ${this.name}`);
             } else {
-                // Filter out duplicates
-                const newArticles = await this.filterDuplicates(articles);
+                // Step 1: Sanitize articles
+                const sanitizationConfig = this.getSanitizationConfig();
+                const sanitizationResults = sanitizeArticles(articles, sanitizationConfig);
+                const sanitizedArticles = sanitizationResults.map(r => r.article);
+
+                // Log sanitization statistics
+                const fieldsModifiedCount = sanitizationResults.filter(r => r.fieldsModified.length > 0).length;
+                if (fieldsModifiedCount > 0) {
+                    log.info(`Sanitized ${fieldsModifiedCount} articles`);
+                }
+
+                // Step 2: Apply date filtering
+                let processedArticles = sanitizedArticles;
+                if (startDate || endDate) {
+                    const dateFilterResult = filterByDateRange(sanitizedArticles, { startDate, endDate });
+                    processedArticles = dateFilterResult.included;
+                    articlesFilteredByDate = dateFilterResult.excludedCount;
+
+                    if (articlesFilteredByDate > 0) {
+                        log.info(`Filtered ${articlesFilteredByDate} articles by date range`);
+                    }
+                    if (dateFilterResult.missingDateCount > 0) {
+                        log.info(`Included ${dateFilterResult.missingDateCount} articles with missing publication date`);
+                    }
+                }
+
+                // Step 3: Filter out duplicates
+                const newArticles = await this.filterDuplicates(processedArticles);
                 log.info(`${newArticles.length} new articles after deduplication`);
 
                 if (newArticles.length > 0) {
@@ -102,13 +151,22 @@ export abstract class BaseCrawler<T extends BaseCrawlerConfig = BaseCrawlerConfi
         const status = this.determineStatus(articlesFound, articlesSaved, errors);
 
         // Build and save result
-        const result = this.buildResult(articlesFound, articlesSaved, duration, errors, status);
+        const result = this.buildResult(
+            articlesFound,
+            articlesSaved,
+            duration,
+            errors,
+            status,
+            target,
+            articlesFilteredByDate > 0 ? articlesFilteredByDate : undefined
+        );
         await this.saveHistory(result);
 
         log.info(`Completed crawl for ${this.name}`, {
             duration: `${duration}ms`,
             found: articlesFound,
             saved: articlesSaved,
+            filteredByDate: articlesFilteredByDate,
             status
         });
 
@@ -116,10 +174,19 @@ export abstract class BaseCrawler<T extends BaseCrawlerConfig = BaseCrawlerConfi
     }
 
     /**
+     * Get sanitization configuration for this crawler
+     * Override in subclasses to provide source-specific config
+     */
+    protected getSanitizationConfig(): Partial<SanitizationConfig> | undefined {
+        return undefined; // Use default config
+    }
+
+    /**
      * Abstract method - fetch articles from the source
      * Must be implemented by subclasses
+     * @param target Optional target account (social media) or source name (website)
      */
-    protected abstract fetchArticles(): Promise<Article[]>;
+    protected abstract fetchArticles(target?: string): Promise<Article[]>;
 
     /**
      * Filter out articles that already exist in database
@@ -163,7 +230,9 @@ export abstract class BaseCrawler<T extends BaseCrawlerConfig = BaseCrawlerConfi
         articlesSaved: number,
         duration: number,
         errors: string[],
-        status: CrawlStatus
+        status: CrawlStatus,
+        target?: string,
+        articlesFilteredByDate?: number
     ): CrawlResult {
         return {
             source: this.name,
@@ -172,7 +241,9 @@ export abstract class BaseCrawler<T extends BaseCrawlerConfig = BaseCrawlerConfi
             articlesFound,
             articlesSaved,
             errors,
-            status
+            status,
+            target,
+            articlesFilteredByDate
         };
     }
 
